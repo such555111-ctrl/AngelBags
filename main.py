@@ -1,12 +1,16 @@
 import os
 import json
 import uuid
+import base64
 import logging
 from datetime import datetime, timezone
 
 from flask import Flask, request, send_from_directory, abort, jsonify
 import telebot
 from telebot import types
+import psycopg2
+import psycopg2.extras
+import requests
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("angelbags")
@@ -39,6 +43,21 @@ PROMOS_FILE = os.path.join(APP_DIR, "promos.json")
 UPLOAD_DIR = os.path.join(APP_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# Строка подключения к базе данных Postgres (например Neon). Если задана —
+# товары/заказы/вопросы/промокоды хранятся в базе данных и переживают
+# рестарты и редеплои на Render. Если не задана — приложение по-прежнему
+# работает на локальных JSON-файлах (удобно для локальной разработки).
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Ключ бесплатного фотохостинга ImgBB (https://api.imgbb.com/) — берётся из
+# переменной окружения. Если задан, фото товаров из админки загружаются
+# на ImgBB и в базу сохраняется постоянная ссылка на файл — так фотографии
+# переживают рестарты и редеплои без платного диска на Render. Если не
+# задан, приложение продолжает сохранять фото на локальный диск в uploads/
+# (годится для локальной разработки; на бесплатном Render такие фото
+# пропадут при рестарте).
+IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
+
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_BADGES = {"hit", "trend", "sale", "instock"}
 ALLOWED_PROMO_TYPES = {"percent", "fixed"}
@@ -58,7 +77,105 @@ def require_admin():
         abort(401, description="Неверный пароль")
 
 
+# --- База данных (Postgres) ----------------------------------------------
+#
+# Данные хранятся по-простому: одна таблица app_data(key, data jsonb),
+# где key — это "products" / "orders" / "questions" / "promos", а data —
+# весь список целиком в формате JSON (та же структура, что раньше лежала
+# в products.json / orders.json / questions.json / promos.json). Это
+# позволяет не переписывать всю бизнес-логику ниже — она как работала со
+# списками словарей в Python, так и продолжает работать — просто теперь
+# данные хранятся в базе, а не в файлах на диске контейнера.
+
+def get_db_connection():
+    if not DATABASE_URL:
+        return None
+    return psycopg2.connect(DATABASE_URL)
+
+
+def init_db():
+    if not DATABASE_URL:
+        log.info("DATABASE_URL не задан — используются локальные JSON-файлы.")
+        return
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_data (
+                    key TEXT PRIMARY KEY,
+                    data JSONB NOT NULL DEFAULT '[]'::jsonb
+                )
+                """
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Одноразовая миграция: если в базе для ключа ещё ничего нет, а рядом
+    # лежит старый JSON-файл — подхватываем из него данные, чтобы ничего
+    # не потерять при переходе с локального хранения на базу.
+    _seed_from_file_if_empty("products", PRODUCTS_FILE)
+    _seed_from_file_if_empty("orders", ORDERS_FILE)
+    _seed_from_file_if_empty("questions", QUESTIONS_FILE)
+    _seed_from_file_if_empty("promos", PROMOS_FILE)
+
+
+def _seed_from_file_if_empty(key, path):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM app_data WHERE key = %s", (key,))
+            if cur.fetchone() is not None:
+                return
+        items = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                try:
+                    items = json.load(f)
+                except Exception:
+                    items = []
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO app_data (key, data) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
+                (key, psycopg2.extras.Json(items)),
+            )
+        conn.commit()
+        log.info("Ключ '%s' перенесён в базу данных (%d записей).", key, len(items))
+    finally:
+        conn.close()
+
+
+def _db_load(key):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT data FROM app_data WHERE key = %s", (key,))
+            row = cur.fetchone()
+            return row[0] if row else []
+    finally:
+        conn.close()
+
+
+def _db_save(key, items):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO app_data (key, data) VALUES (%s, %s)
+                ON CONFLICT (key) DO UPDATE SET data = EXCLUDED.data
+                """,
+                (key, psycopg2.extras.Json(items)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def load_products():
+    if DATABASE_URL:
+        return _db_load("products")
     if not os.path.exists(PRODUCTS_FILE):
         return []
     with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
@@ -66,11 +183,16 @@ def load_products():
 
 
 def save_products(items):
+    if DATABASE_URL:
+        _db_save("products", items)
+        return
     with open(PRODUCTS_FILE, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 
 def load_orders():
+    if DATABASE_URL:
+        return _db_load("orders")
     if not os.path.exists(ORDERS_FILE):
         return []
     with open(ORDERS_FILE, "r", encoding="utf-8") as f:
@@ -78,11 +200,16 @@ def load_orders():
 
 
 def save_orders(items):
+    if DATABASE_URL:
+        _db_save("orders", items)
+        return
     with open(ORDERS_FILE, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 
 def load_questions():
+    if DATABASE_URL:
+        return _db_load("questions")
     if not os.path.exists(QUESTIONS_FILE):
         return []
     with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
@@ -90,11 +217,16 @@ def load_questions():
 
 
 def save_questions(items):
+    if DATABASE_URL:
+        _db_save("questions", items)
+        return
     with open(QUESTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
 
 
 def load_promos():
+    if DATABASE_URL:
+        return _db_load("promos")
     if not os.path.exists(PROMOS_FILE):
         return []
     with open(PROMOS_FILE, "r", encoding="utf-8") as f:
@@ -102,8 +234,32 @@ def load_promos():
 
 
 def save_promos(items):
+    if DATABASE_URL:
+        _db_save("promos", items)
+        return
     with open(PROMOS_FILE, "w", encoding="utf-8") as f:
         json.dump(items, f, ensure_ascii=False, indent=2)
+
+
+# --- Фотохостинг ImgBB ----------------------------------------------------
+
+def upload_to_imgbb(file_bytes):
+    """Загружает изображение на ImgBB и возвращает постоянную прямую ссылку.
+
+    Бросает исключение, если ImgBB вернул ошибку или недоступен."""
+    resp = requests.post(
+        "https://api.imgbb.com/1/upload",
+        params={"key": IMGBB_API_KEY},
+        data={"image": base64.b64encode(file_bytes).decode("ascii")},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    if not payload.get("success"):
+        message = (payload.get("error") or {}).get("message", "неизвестная ошибка ImgBB")
+        raise RuntimeError(message)
+    # "url" — прямая постоянная ссылка на изображение в исходном размере.
+    return payload["data"]["url"]
 
 
 def fmt_price(n):
@@ -264,7 +420,7 @@ def index():
 
 @app.route("/products.json", methods=["GET"])
 def products():
-    return send_from_directory(APP_DIR, "products.json")
+    return jsonify(load_products())
 
 
 @app.route("/api/order", methods=["POST"])
@@ -651,8 +807,23 @@ def admin_upload():
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_IMAGE_EXT:
         abort(400, description="Недопустимый формат файла")
+
+    file_bytes = file.read()
+
+    if IMGBB_API_KEY:
+        try:
+            url = upload_to_imgbb(file_bytes)
+        except Exception as e:
+            log.exception("Не удалось загрузить фото на ImgBB")
+            abort(502, description=f"Не удалось загрузить фото на фотохостинг: {e}")
+        return jsonify({"url": url}), 201
+
+    # Фолбэк без ключа ImgBB — сохраняем на локальный диск (только для
+    # локальной разработки; на бесплатном Render такие файлы пропадут
+    # при рестарте, так что для продакшена задайте IMGBB_API_KEY).
     filename = f"{uuid.uuid4().hex}{ext}"
-    file.save(os.path.join(UPLOAD_DIR, filename))
+    with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
+        f.write(file_bytes)
     return jsonify({"url": f"/uploads/{filename}"}), 201
 
 
@@ -888,6 +1059,7 @@ def setup_webhook():
     log.info("Webhook установлен: %s", url)
 
 
+init_db()
 setup_webhook()
 
 if __name__ == "__main__":

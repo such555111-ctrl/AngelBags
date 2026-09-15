@@ -14,9 +14,11 @@ services:
         sync: false
       - key: ADMIN_CHAT_ID
         sync: false
-    # Опционально: платный постоянный диск, чтобы товары и загруженные фото
-    # не пропадали при рестарте/редеплое (см. README, раздел "Постоянное хранилище").
-    # disk:
-    #   name: angelbags-data
-    #   mountPath: /opt/render/project/src
-    #   sizeGB: 1
+      - key: DATABASE_URL
+        sync: false
+      - key: IMGBB_API_KEY
+        sync: false
+    # Товары/заказы/вопросы/промокоды хранятся в Postgres (DATABASE_URL), а
+    # фото товаров — на бесплатном фотохостинге ImgBB (IMGBB_API_KEY).
+    # Локальный диск контейнера ни для чего из этого не используется, так что
+    # платный Persistent Disk на Render больше не нужен вообще.

@@ -194,9 +194,9 @@
   .card-body{flex:1;min-width:0;position:relative;z-index:1;}
   .card-title{font-size:14px;font-family:var(--font-heading);font-weight:700;text-transform:uppercase;letter-spacing:.01em;}
   .card-sub{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5;}
-  .card-actions{display:flex;gap:8px;margin-top:12px;position:relative;z-index:1;align-items:center;}
-  .card-actions .btn-outline{padding:8px 14px;font-size:10px;}
-  .card-actions .btn-outline.btn-icon-label{flex:1;justify-content:center;}
+  .card-actions{display:flex;gap:6px;margin-top:12px;position:relative;z-index:1;align-items:center;}
+  .card-actions .btn-outline{padding:8px 8px;font-size:9.5px;}
+  .card-actions .btn-outline.btn-icon-label{flex:1;justify-content:center;gap:4px;white-space:nowrap;}
   .btn-icon-only{
     flex:0 0 auto;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;
     background:transparent;color:var(--danger);border:1.5px solid var(--danger);border-radius:8px;
@@ -706,9 +706,9 @@ function renderList(){
         <div class="card-sub">Размеры: ${(p.sizes||[]).join(', ')}</div>
         <div class="card-sub">${photoCount ? `Фото: ${photoCount}` : 'Без фото'}</div>
         <div class="card-actions">
-          <button class="btn-outline btn-icon-label" data-edit="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Изменить</button>
-          <button class="btn-outline btn-icon-label" data-dup="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Дублировать</button>
           <button class="btn-icon-only" data-del="${p.id}" title="Удалить" aria-label="Удалить"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>
+          <button class="btn-outline btn-icon-label" data-edit="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Изменить</button>
+          <button class="btn-outline btn-icon-label" data-dup="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Копия</button>
         </div>
       </div>
     </div>

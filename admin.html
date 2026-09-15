@@ -699,6 +699,7 @@ function renderList(){
         <div class="card-sub">${photoCount ? `Фото: ${photoCount}` : 'Без фото'}</div>
         <div class="card-actions">
           <button class="btn-outline btn-icon-label" data-edit="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Изменить</button>
+          <button class="btn-outline btn-icon-label" data-dup="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>Дублировать</button>
           <button class="btn-danger btn-icon-label" data-del="${p.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>Удалить</button>
         </div>
       </div>
@@ -706,6 +707,7 @@ function renderList(){
   `;
   }).join('');
   list.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(Number(b.dataset.edit)));
+  list.querySelectorAll('[data-dup]').forEach(b => b.onclick = () => duplicateProduct(Number(b.dataset.dup)));
   list.querySelectorAll('[data-del]').forEach(b => b.onclick = () => deleteProduct(Number(b.dataset.del)));
 }
 
@@ -1070,14 +1072,19 @@ document.querySelectorAll('#badgePicker .badge-opt').forEach(btn=>{
   btn.onclick = () => { selectedBadge = btn.dataset.badge; renderBadgePicker(); };
 });
 
-function openModal(id){
-  editingId = id || null;
+function openModal(id, duplicateSource){
+  // duplicateSource — если задан, модалка заполняется данными этого товара,
+  // но editingId остаётся пустым, так что при сохранении создастся НОВЫЙ
+  // товар (копия), а не изменится исходный.
+  editingId = duplicateSource ? null : (id || null);
   uploadedImages = [];
   document.getElementById('formError').textContent = '';
-  const p = id ? products.find(x=>x.id===id) : null;
+  const p = duplicateSource || (id ? products.find(x=>x.id===id) : null);
 
-  document.getElementById('modalTitle').textContent = p ? 'Изменить товар' : 'Новый товар';
-  document.getElementById('modalSub').textContent = p ? p.name : 'заполните карточку товара';
+  document.getElementById('modalTitle').textContent = duplicateSource ? 'Копия товара' : (p ? 'Изменить товар' : 'Новый товар');
+  document.getElementById('modalSub').textContent = duplicateSource
+    ? `на основе «${p.name}» — поменяйте фото и цвет`
+    : (p ? p.name : 'заполните карточку товара');
   document.getElementById('fName').value = p?.name || '';
   document.getElementById('fCategory').value = p?.category || '';
   document.getElementById('fBrand').value = p?.brand || '';
@@ -1102,6 +1109,13 @@ function openModal(id){
   document.getElementById('colorOptions').innerHTML = colors.map(c=>`<option value="${c}">`).join('');
 
   document.getElementById('overlay').classList.add('open');
+  if (duplicateSource) showToast('Товар скопирован — поменяйте фото и цвет и сохраните');
+}
+
+function duplicateProduct(id){
+  const src = products.find(x=>x.id===id);
+  if (!src) return;
+  openModal(null, src);
 }
 
 function closeModal(){

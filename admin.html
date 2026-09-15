@@ -1141,6 +1141,51 @@ function renderPhotoGrid(){
   document.getElementById('photoAddTile').onclick = () => document.getElementById('photoInput').click();
 }
 
+// Сжимает фото перед отправкой: уменьшает разрешение и качество JPEG.
+// Это сильно уменьшает размер файла (с 5-15 МБ до ~200-800 КБ), что
+// резко снижает риск обрыва загрузки на медленном мобильном интернете
+// и укладывается в лимит сервера (8 МБ на файл).
+function compressImage(file, maxDimension = 1600, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    // GIF не трогаем (могут быть анимированными) — шлём как есть.
+    if (file.type === 'image/gif') { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) { height = Math.round(height * maxDimension / width); width = maxDimension; }
+        else { width = Math.round(width * maxDimension / height); height = maxDimension; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; } // на всякий случай — не смогли сжать, шлём оригинал
+        resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; // не смогли прочитать — шлём оригинал
+    img.src = url;
+  });
+}
+
+async function uploadOneFile(file, attempt = 1){
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/admin/upload', { method:'POST', headers:{ 'X-Admin-Password': pwd }, body: fd });
+  if (!res.ok){
+    const err = await res.json().catch(()=>({}));
+    // Одна повторная попытка при ошибке загрузки на фотохостинг —
+    // помогает при случайном обрыве мобильной сети.
+    if (res.status === 502 && attempt < 2) return uploadOneFile(file, attempt + 1);
+    throw new Error(err.error || 'Не удалось загрузить фото');
+  }
+  return res.json();
+}
+
 document.getElementById('photoInput').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
@@ -1156,14 +1201,8 @@ document.getElementById('photoInput').addEventListener('change', async (e) => {
 
   for (let i = 0; i < files.length; i++){
     try {
-      const fd = new FormData();
-      fd.append('file', files[i]);
-      const res = await fetch('/api/admin/upload', { method:'POST', headers:{ 'X-Admin-Password': pwd }, body: fd });
-      if (!res.ok){
-        const err = await res.json().catch(()=>({}));
-        throw new Error(err.error || 'Не удалось загрузить фото');
-      }
-      const data = await res.json();
+      const compressed = await compressImage(files[i]);
+      const data = await uploadOneFile(compressed);
       uploadedImages.push(data.url);
     } catch(err){
       showToast(err.message);

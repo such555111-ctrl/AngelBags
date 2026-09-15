@@ -243,23 +243,40 @@ def save_promos(items):
 
 # --- Фотохостинг ImgBB ----------------------------------------------------
 
-def upload_to_imgbb(file_bytes):
+def upload_to_imgbb(file_bytes, retries=2):
     """Загружает изображение на ImgBB и возвращает постоянную прямую ссылку.
 
-    Бросает исключение, если ImgBB вернул ошибку или недоступен."""
-    resp = requests.post(
-        "https://api.imgbb.com/1/upload",
-        params={"key": IMGBB_API_KEY},
-        data={"image": base64.b64encode(file_bytes).decode("ascii")},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    payload = resp.json()
-    if not payload.get("success"):
-        message = (payload.get("error") or {}).get("message", "неизвестная ошибка ImgBB")
-        raise RuntimeError(message)
-    # "url" — прямая постоянная ссылка на изображение в исходном размере.
-    return payload["data"]["url"]
+    Бросает исключение, если ImgBB вернул ошибку или недоступен.
+    Делает несколько попыток при сетевых сбоях/таймаутах (например, если
+    админ загружает фото с телефона на медленном мобильном интернете)."""
+    if not file_bytes:
+        # Файл дошёл до сервера пустым — обычно из-за обрыва соединения
+        # на слабой мобильной сети до того, как тело запроса докачалось.
+        raise RuntimeError(
+            "файл пришёл пустым (обрыв соединения при загрузке) — попробуйте ещё раз"
+        )
+
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.post(
+                "https://api.imgbb.com/1/upload",
+                params={"key": IMGBB_API_KEY},
+                data={"image": base64.b64encode(file_bytes).decode("ascii")},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            if not payload.get("success"):
+                message = (payload.get("error") or {}).get("message", "неизвестная ошибка ImgBB")
+                raise RuntimeError(message)
+            # "url" — прямая постоянная ссылка на изображение в исходном размере.
+            return payload["data"]["url"]
+        except (requests.exceptions.RequestException, RuntimeError) as e:
+            last_error = e
+            if attempt < retries:
+                continue
+    raise last_error
 
 
 def fmt_price(n):

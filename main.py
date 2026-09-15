@@ -118,6 +118,10 @@ def sanitize_images(raw):
     return []
 
 
+def sanitize_brand(raw):
+    return (raw or "").strip()
+
+
 def sanitize_badge(raw):
     b = str(raw or "").strip().lower()
     return b if b in ALLOWED_BADGES else None
@@ -549,6 +553,7 @@ def admin_create_product():
         "id": new_id,
         "name": (data.get("name") or "").strip(),
         "category": (data.get("category") or "").strip(),
+        "brand": sanitize_brand(data.get("brand")),
         "price": price,
         "old_price": sanitize_old_price(data.get("old_price")),
         "badge": sanitize_badge(data.get("badge")),
@@ -574,6 +579,8 @@ def admin_update_product(pid):
                 p["name"] = (data.get("name") or "").strip()
             if "category" in data:
                 p["category"] = (data.get("category") or "").strip()
+            if "brand" in data:
+                p["brand"] = sanitize_brand(data.get("brand"))
             if "price" in data:
                 try:
                     p["price"] = int(float(data.get("price") or 0))

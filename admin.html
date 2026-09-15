@@ -435,13 +435,18 @@
     <div class="row">
       <div>
         <label>Категория</label>
-        <input type="text" id="fCategory" placeholder="Кроссовки">
+        <input type="text" id="fCategory" placeholder="Кроссбоди" list="categoryOptions">
+        <datalist id="categoryOptions"></datalist>
       </div>
       <div>
-        <label>Цена, ₽</label>
-        <input type="number" id="fPrice" placeholder="6990">
+        <label>Бренд</label>
+        <input type="text" id="fBrand" placeholder="AngelBags" list="brandOptions">
+        <datalist id="brandOptions"></datalist>
       </div>
     </div>
+
+    <label>Цена, ₽</label>
+    <input type="number" id="fPrice" placeholder="6990">
 
     <label>Старая цена, ₽ <span class="muted" style="text-transform:none;letter-spacing:0;">— необязательно, покажется зачёркнутой рядом с новой ценой</span></label>
     <input type="number" id="fOldPrice" placeholder="8990">
@@ -672,7 +677,7 @@ function renderList(){
       <div class="thumb" style="${cover ? `background-image:url('${cover}')` : `background:${SWATCHES[p.swatch % SWATCHES.length]}`}"></div>
       <div class="card-body">
         <div class="card-title">${p.name || '(без названия)'}</div>
-        <div class="card-sub">${p.category || '—'} · ${priceLineHTML(p)}${badgeTag}</div>
+        <div class="card-sub">${p.brand ? `<span style="color:var(--accent);">${p.brand}</span> · ` : ''}${p.category || '—'} · ${priceLineHTML(p)}${badgeTag}</div>
         <div class="card-sub">Размеры: ${(p.sizes||[]).join(', ')}</div>
         <div class="card-sub">${photoCount ? `Фото: ${photoCount}` : 'Без фото'}</div>
         <div class="card-actions">
@@ -1057,6 +1062,7 @@ function openModal(id){
   document.getElementById('modalSub').textContent = p ? p.name : 'заполните карточку товара';
   document.getElementById('fName').value = p?.name || '';
   document.getElementById('fCategory').value = p?.category || '';
+  document.getElementById('fBrand').value = p?.brand || '';
   document.getElementById('fPrice').value = p?.price || '';
   document.getElementById('fOldPrice').value = p?.old_price || '';
   document.getElementById('fSizes').value = (p?.sizes||[]).join(', ');
@@ -1067,6 +1073,11 @@ function openModal(id){
   renderSwatchPicker();
   renderBadgePicker();
   renderPhotoGrid();
+
+  const cats = [...new Set(products.map(x=>x.category).filter(Boolean))];
+  document.getElementById('categoryOptions').innerHTML = cats.map(c=>`<option value="${c}">`).join('');
+  const brands = [...new Set(products.map(x=>x.brand).filter(Boolean))];
+  document.getElementById('brandOptions').innerHTML = brands.map(b=>`<option value="${b}">`).join('');
 
   document.getElementById('overlay').classList.add('open');
 }
@@ -1143,18 +1154,19 @@ document.getElementById('photoInput').addEventListener('change', async (e) => {
 document.getElementById('saveBtn').onclick = async () => {
   const name = document.getElementById('fName').value.trim();
   const category = document.getElementById('fCategory').value.trim();
+  const brand = document.getElementById('fBrand').value.trim();
   const price = document.getElementById('fPrice').value;
   const oldPrice = document.getElementById('fOldPrice').value;
   const sizes = document.getElementById('fSizes').value;
   const desc = document.getElementById('fDesc').value.trim();
 
 
-  if (!name || !category || !price){
-    document.getElementById('formError').textContent = 'Заполните название, категорию и цену';
+  if (!name || !category || !brand || !price){
+    document.getElementById('formError').textContent = 'Заполните название, категорию, бренд и цену';
     return;
   }
 
-  const payload = { name, category, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages };
+  const payload = { name, category, brand, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages };
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   try {

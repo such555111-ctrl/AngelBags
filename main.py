@@ -267,6 +267,19 @@ def upload_to_imgbb(file_bytes, retries=2):
     if not IMGBB_API_KEY:
         raise RuntimeError("IMGBB_API_KEY не задан")
 
+    # ImgBB банит запросы без "человеческого" User-Agent (по умолчанию requests
+    # шлёт "python-requests/x.x.x", что ImgBB палит как бота и отвечает
+    # {"code":103,"message":"You have been forbidden to use this website."}).
+    # Притворяемся обычным браузером, чтобы пройти эту проверку.
+    HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://imgbb.com/",
+    }
+
     last_error = None
     for attempt in range(1, retries + 1):
         try:
@@ -274,6 +287,7 @@ def upload_to_imgbb(file_bytes, retries=2):
                 "https://api.imgbb.com/1/upload",
                 params={"key": IMGBB_API_KEY},
                 data={"image": base64.b64encode(file_bytes).decode("ascii")},
+                headers=HEADERS,
                 timeout=30,
             )
             # ImgBB всегда возвращает JSON с описанием ошибки в теле ответа,

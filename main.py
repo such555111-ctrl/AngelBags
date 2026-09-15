@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import uuid
 import base64
@@ -11,6 +12,8 @@ from telebot import types
 import psycopg2
 import psycopg2.extras
 import requests
+import cloudinary
+import cloudinary.uploader
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("angelbags")
@@ -49,22 +52,24 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # работает на локальных JSON-файлах (удобно для локальной разработки).
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Ключ бесплатного фотохостинга ImgBB (https://api.imgbb.com/) — берётся из
-# переменной окружения. Если задан, фото товаров из админки загружаются
-# на ImgBB и в базу сохраняется постоянная ссылка на файл — так фотографии
-# переживают рестарты и редеплои без платного диска на Render. Если не
-# задан, приложение продолжает сохранять фото на локальный диск в uploads/
-# (годится для локальной разработки; на бесплатном Render такие фото
-# пропадут при рестарте).
-IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
-if IMGBB_API_KEY:
-    IMGBB_API_KEY = IMGBB_API_KEY.strip()
-    if len(IMGBB_API_KEY) != 32:
-        log.warning(
-            "angelbags: IMGBB_API_KEY имеет подозрительную длину (%d символов, ожидается 32) — "
-            "проверьте, не скопировался ли лишний пробел/перенос строки при вставке в Render",
-            len(IMGBB_API_KEY),
-        )
+# Фотохостинг Cloudinary (https://cloudinary.com/) — берётся из переменных
+# окружения. Если заданы все три значения, фото товаров из админки
+# загружаются на Cloudinary и в базу сохраняется постоянная ссылка на
+# файл — так фотографии переживают рестарты и редеплои без платного диска
+# на Render. Если не заданы, приложение продолжает сохранять фото на
+# локальный диск в uploads/ (годится для локальной разработки; на
+# бесплатном Render такие фото пропадут при рестарте).
+CLOUDINARY_CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "").strip()
+CLOUDINARY_API_KEY = os.environ.get("CLOUDINARY_API_KEY", "").strip()
+CLOUDINARY_API_SECRET = os.environ.get("CLOUDINARY_API_SECRET", "").strip()
+CLOUDINARY_ENABLED = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True,
+    )
 
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_BADGES = {"hit", "trend", "sale", "instock"}
@@ -251,10 +256,10 @@ def save_promos(items):
 
 # --- Фотохостинг ImgBB ----------------------------------------------------
 
-def upload_to_imgbb(file_bytes, retries=2):
-    """Загружает изображение на ImgBB и возвращает постоянную прямую ссылку.
+def upload_to_cloudinary(file_bytes, retries=2):
+    """Загружает изображение на Cloudinary и возвращает постоянную прямую ссылку.
 
-    Бросает исключение, если ImgBB вернул ошибку или недоступен.
+    Бросает исключение, если Cloudinary вернул ошибку или недоступен.
     Делает несколько попыток при сетевых сбоях/таймаутах (например, если
     админ загружает фото с телефона на медленном мобильном интернете)."""
     if not file_bytes:
@@ -264,57 +269,27 @@ def upload_to_imgbb(file_bytes, retries=2):
             "файл пришёл пустым (обрыв соединения при загрузке) — попробуйте ещё раз"
         )
 
-    if not IMGBB_API_KEY:
-        raise RuntimeError("IMGBB_API_KEY не задан")
-
-    # ImgBB банит запросы без "человеческого" User-Agent (по умолчанию requests
-    # шлёт "python-requests/x.x.x", что ImgBB палит как бота и отвечает
-    # {"code":103,"message":"You have been forbidden to use this website."}).
-    # Притворяемся обычным браузером, чтобы пройти эту проверку.
-    HEADERS = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json, text/plain, */*",
-        "Referer": "https://imgbb.com/",
-    }
+    if not CLOUDINARY_ENABLED:
+        raise RuntimeError(
+            "CLOUDINARY_CLOUD_NAME/CLOUDINARY_API_KEY/CLOUDINARY_API_SECRET не заданы"
+        )
 
     last_error = None
     for attempt in range(1, retries + 1):
         try:
-            resp = requests.post(
-                "https://api.imgbb.com/1/upload",
-                params={"key": IMGBB_API_KEY},
-                data={"image": base64.b64encode(file_bytes).decode("ascii")},
-                headers=HEADERS,
-                timeout=30,
+            result = cloudinary.uploader.upload(
+                io.BytesIO(file_bytes),
+                folder="angelbags",
+                resource_type="image",
             )
-            # ImgBB всегда возвращает JSON с описанием ошибки в теле ответа,
-            # даже при 400/403 и т.п. — resp.raise_for_status() эту причину
-            # скрывает, оставляя только "400 Bad Request" без деталей. Разбираем
-            # тело сами, чтобы в логах было видно настоящую причину отказа
-            # (неверный/просроченный ключ, бан IP, пустой файл и т.д.).
-            try:
-                payload = resp.json()
-            except ValueError:
-                payload = None
-
-            if not resp.ok or not payload or not payload.get("success"):
-                message = None
-                if payload:
-                    message = (payload.get("error") or {}).get("message")
-                if not message:
-                    message = f"ImgBB HTTP {resp.status_code}: {resp.text[:300]}"
-                log.error(
-                    "angelbags:upload_to_imgbb — попытка %d/%d, статус=%s, ответ=%s",
-                    attempt, retries, resp.status_code, resp.text[:500],
-                )
-                raise RuntimeError(message)
-            # "url" — прямая постоянная ссылка на изображение в исходном размере.
-            return payload["data"]["url"]
-        except (requests.exceptions.RequestException, RuntimeError) as e:
+            # "secure_url" — прямая постоянная ссылка на изображение (https).
+            return result["secure_url"]
+        except Exception as e:
             last_error = e
+            log.error(
+                "angelbags:upload_to_cloudinary — попытка %d/%d, ошибка=%s",
+                attempt, retries, e,
+            )
             if attempt < retries:
                 continue
     raise last_error
@@ -875,23 +850,24 @@ def admin_upload():
     # Диагностика: пишем в лог реальный размер полученных байт, заявленный
     # Content-Length и mimetype — чтобы точно увидеть, доходит ли файл до
     # сервера целиком, или обрезается раньше (на прокси/сети), или сервер
-    # получает его нормально, а проблема уже в самом вызове ImgBB.
+    # получает его нормально, а проблема уже в самом вызове Cloudinary.
     log.info(
         "angelbags:upload — filename=%s mimetype=%s заявленный Content-Length=%s фактически прочитано байт=%s",
         file.filename, file.mimetype, request.content_length, len(file_bytes),
     )
 
-    if IMGBB_API_KEY:
+    if CLOUDINARY_ENABLED:
         try:
-            url = upload_to_imgbb(file_bytes)
+            url = upload_to_cloudinary(file_bytes)
         except Exception as e:
-            log.exception("Не удалось загрузить фото на ImgBB")
+            log.exception("Не удалось загрузить фото на Cloudinary")
             abort(502, description=f"Не удалось загрузить фото на фотохостинг: {e}")
         return jsonify({"url": url}), 201
 
-    # Фолбэк без ключа ImgBB — сохраняем на локальный диск (только для
+    # Фолбэк без ключей Cloudinary — сохраняем на локальный диск (только для
     # локальной разработки; на бесплатном Render такие файлы пропадут
-    # при рестарте, так что для продакшена задайте IMGBB_API_KEY).
+    # при рестарте, так что для продакшена задайте CLOUDINARY_CLOUD_NAME,
+    # CLOUDINARY_API_KEY и CLOUDINARY_API_SECRET).
     filename = f"{uuid.uuid4().hex}{ext}"
     with open(os.path.join(UPLOAD_DIR, filename), "wb") as f:
         f.write(file_bytes)

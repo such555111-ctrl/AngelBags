@@ -57,6 +57,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 # (годится для локальной разработки; на бесплатном Render такие фото
 # пропадут при рестарте).
 IMGBB_API_KEY = os.environ.get("IMGBB_API_KEY")
+if IMGBB_API_KEY:
+    IMGBB_API_KEY = IMGBB_API_KEY.strip()
+    if len(IMGBB_API_KEY) != 32:
+        log.warning(
+            "angelbags: IMGBB_API_KEY имеет подозрительную длину (%d символов, ожидается 32) — "
+            "проверьте, не скопировался ли лишний пробел/перенос строки при вставке в Render",
+            len(IMGBB_API_KEY),
+        )
 
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_BADGES = {"hit", "trend", "sale", "instock"}
@@ -820,12 +828,25 @@ def admin_upload():
     require_admin()
     file = request.files.get("file")
     if not file or not file.filename:
+        log.error(
+            "angelbags:upload — файл не найден в запросе. form keys=%s files keys=%s Content-Type=%s Content-Length=%s",
+            list(request.form.keys()), list(request.files.keys()),
+            request.content_type, request.content_length,
+        )
         abort(400, description="Файл не передан")
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_IMAGE_EXT:
         abort(400, description="Недопустимый формат файла")
 
     file_bytes = file.read()
+    # Диагностика: пишем в лог реальный размер полученных байт, заявленный
+    # Content-Length и mimetype — чтобы точно увидеть, доходит ли файл до
+    # сервера целиком, или обрезается раньше (на прокси/сети), или сервер
+    # получает его нормально, а проблема уже в самом вызове ImgBB.
+    log.info(
+        "angelbags:upload — filename=%s mimetype=%s заявленный Content-Length=%s фактически прочитано байт=%s",
+        file.filename, file.mimetype, request.content_length, len(file_bytes),
+    )
 
     if IMGBB_API_KEY:
         try:

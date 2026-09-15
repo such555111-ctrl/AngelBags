@@ -264,6 +264,9 @@ def upload_to_imgbb(file_bytes, retries=2):
             "файл пришёл пустым (обрыв соединения при загрузке) — попробуйте ещё раз"
         )
 
+    if not IMGBB_API_KEY:
+        raise RuntimeError("IMGBB_API_KEY не задан")
+
     last_error = None
     for attempt in range(1, retries + 1):
         try:
@@ -273,10 +276,26 @@ def upload_to_imgbb(file_bytes, retries=2):
                 data={"image": base64.b64encode(file_bytes).decode("ascii")},
                 timeout=30,
             )
-            resp.raise_for_status()
-            payload = resp.json()
-            if not payload.get("success"):
-                message = (payload.get("error") or {}).get("message", "неизвестная ошибка ImgBB")
+            # ImgBB всегда возвращает JSON с описанием ошибки в теле ответа,
+            # даже при 400/403 и т.п. — resp.raise_for_status() эту причину
+            # скрывает, оставляя только "400 Bad Request" без деталей. Разбираем
+            # тело сами, чтобы в логах было видно настоящую причину отказа
+            # (неверный/просроченный ключ, бан IP, пустой файл и т.д.).
+            try:
+                payload = resp.json()
+            except ValueError:
+                payload = None
+
+            if not resp.ok or not payload or not payload.get("success"):
+                message = None
+                if payload:
+                    message = (payload.get("error") or {}).get("message")
+                if not message:
+                    message = f"ImgBB HTTP {resp.status_code}: {resp.text[:300]}"
+                log.error(
+                    "angelbags:upload_to_imgbb — попытка %d/%d, статус=%s, ответ=%s",
+                    attempt, retries, resp.status_code, resp.text[:500],
+                )
                 raise RuntimeError(message)
             # "url" — прямая постоянная ссылка на изображение в исходном размере.
             return payload["data"]["url"]

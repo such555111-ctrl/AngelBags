@@ -122,6 +122,17 @@ def sanitize_brand(raw):
     return (raw or "").strip()
 
 
+def sanitize_color(raw):
+    return (raw or "").strip()
+
+
+def sanitize_color_hex(raw):
+    v = str(raw or "").strip().lower()
+    if len(v) == 7 and v[0] == "#" and all(c in "0123456789abcdef" for c in v[1:]):
+        return v
+    return None
+
+
 def sanitize_badge(raw):
     b = str(raw or "").strip().lower()
     return b if b in ALLOWED_BADGES else None
@@ -262,11 +273,12 @@ def create_order():
 
     name = (data.get("name") or "").strip()
     phone = (data.get("phone") or "").strip()
+    address = (data.get("address") or "").strip()
     comment = (data.get("comment") or "").strip()
     items = data.get("items") or []
 
-    if not name or not phone:
-        abort(400, description="Укажите имя и телефон")
+    if not name or not phone or not address:
+        abort(400, description="Укажите имя, телефон и адрес доставки")
     if not isinstance(items, list) or not items:
         abort(400, description="Корзина пуста")
 
@@ -298,6 +310,7 @@ def create_order():
         "created_at": datetime.now(timezone.utc).isoformat(),
         "name": name,
         "phone": phone,
+        "address": address,
         "comment": comment,
         "items": items,
         "subtotal": subtotal,
@@ -339,7 +352,8 @@ def create_order():
                 f"Номер заказа: AB-{new_id}\n"
                 f"{items_lines}\n\n"
                 f"{discount_line}"
-                f"Итого: {fmt_price(total)}\n\n"
+                f"Итого: {fmt_price(total)}\n"
+                f"Адрес доставки: {address}\n\n"
                 "Мы свяжемся с вами в этом чате, чтобы подтвердить заказ и "
                 "обсудить доставку."
             )
@@ -350,6 +364,7 @@ def create_order():
         f"🛒 Новый заказ AB-{new_id}\n\n"
         f"Клиент: {name}\n"
         f"Телефон: {phone}\n"
+        f"Адрес доставки: {address}\n"
         + (f"Telegram: @{customer_username}\n" if customer_username else "")
         + f"\n{items_lines}\n\n"
         f"{discount_line}"
@@ -554,6 +569,8 @@ def admin_create_product():
         "name": (data.get("name") or "").strip(),
         "category": (data.get("category") or "").strip(),
         "brand": sanitize_brand(data.get("brand")),
+        "color": sanitize_color(data.get("color")),
+        "color_hex": sanitize_color_hex(data.get("color_hex")),
         "price": price,
         "old_price": sanitize_old_price(data.get("old_price")),
         "badge": sanitize_badge(data.get("badge")),
@@ -581,6 +598,10 @@ def admin_update_product(pid):
                 p["category"] = (data.get("category") or "").strip()
             if "brand" in data:
                 p["brand"] = sanitize_brand(data.get("brand"))
+            if "color" in data:
+                p["color"] = sanitize_color(data.get("color"))
+            if "color_hex" in data:
+                p["color_hex"] = sanitize_color_hex(data.get("color_hex"))
             if "price" in data:
                 try:
                     p["price"] = int(float(data.get("price") or 0))

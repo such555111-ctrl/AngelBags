@@ -7,7 +7,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700;800;900&family=Jost:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-primary:#0B0B0A;
@@ -24,7 +24,7 @@
     --border-radius-btn:12px;
     --font-heading:'Jost',sans-serif;
     --font-body:'Inter',sans-serif;
-    --font-logo:'Cormorant Garamond',serif;
+    --font-logo:'Poppins',sans-serif;
     --bg:var(--bg-primary);
     --bg-elev:var(--bg-card);
     --bg-elev-2:var(--bg-card-hover);
@@ -95,7 +95,7 @@
   @keyframes markSway{0%,100%{transform:rotate(-3deg);}50%{transform:rotate(3deg);}}
   .brand-text{display:flex;flex-direction:column;line-height:1;}
   .logo{
-    font-family:var(--font-logo);font-size:21px;font-weight:600;letter-spacing:.03em;white-space:nowrap;font-style:italic;
+    font-family:var(--font-logo);font-size:20px;font-weight:800;letter-spacing:0;white-space:nowrap;font-style:normal;text-transform:uppercase;
     background:linear-gradient(100deg,var(--text) 0%,var(--accent-neon) 25%,#F6EFD9 40%,var(--accent) 55%,var(--text) 70%,var(--accent-neon) 85%,var(--text) 100%);
     background-size:300% 100%;
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
@@ -169,10 +169,25 @@
   .sort-opt.active{color:var(--accent);background:var(--accent-dim);}
   .sort-opt .chk{opacity:0;font-size:12px;transition:opacity .2s;}
   .sort-opt.active .chk{opacity:1;}
+  .color-wrap{position:relative;flex:0 0 auto;}
+  .color-btn{width:40px;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--bg-elev);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .25s var(--ease);}
+  .color-btn:active{transform:scale(.9);}
+  .color-btn.active{border-color:var(--accent);box-shadow:0 0 15px rgba(198,164,78,.1);}
+  .color-btn-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.35);}
+  .color-btn-ring{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1.5px;width:15px;height:15px;}
+  .color-btn-ring span{border-radius:50%;}
+  .color-menu{position:absolute;top:calc(100% + 10px);right:0;min-width:190px;max-height:280px;overflow-y:auto;z-index:25;background:rgba(15,18,13,.95);border:1px solid var(--line);border-radius:14px;padding:8px;box-shadow:0 20px 50px rgba(0,0,0,.5);opacity:0;pointer-events:none;transform:translateY(-8px) scale(.96);transform-origin:top right;transition:all .25s var(--ease);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);}
+  .color-menu.open{opacity:1;pointer-events:auto;transform:translateY(0) scale(1);}
+  .color-opt{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;color:var(--muted);font-family:var(--font-body);font-size:13px;padding:9px 12px;border-radius:8px;cursor:pointer;transition:all .18s var(--ease);}
+  .color-opt:hover{background:var(--bg-elev-2);color:var(--text);}
+  .color-opt.active{color:var(--accent);background:var(--accent-dim);}
+  .color-opt .dot{flex:0 0 auto;width:13px;height:13px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3);}
+  .card-color-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle;border:1px solid rgba(255,255,255,.35);}
+  .pd-color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid rgba(255,255,255,.35);}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px;transition:opacity .35s var(--ease), transform .35s var(--ease);perspective:1000px;}
   .card{cursor:pointer;animation:cardIn .6s var(--ease) both;transform-style:preserve-3d;transition:transform .4s var(--ease);}
   .card:hover{transform:translateY(-4px) rotateX(2deg);}
-  .card-media{position:relative;aspect-ratio:3/4;border-radius:var(--border-radius-card);overflow:hidden;display:flex;align-items:flex-end;background-color:var(--bg-elev);border:1px solid var(--line);transition:all .4s var(--ease);box-shadow:0 4px 20px rgba(0,0,0,.2);}
+  .card-media{position:relative;aspect-ratio:1/1;border-radius:var(--border-radius-card);overflow:hidden;display:flex;align-items:flex-end;background-color:var(--bg-elev);border:1px solid var(--line);transition:all .4s var(--ease);box-shadow:0 4px 20px rgba(0,0,0,.2);}
   .card:hover .card-media{box-shadow:0 12px 40px rgba(0,0,0,.35), 0 0 30px rgba(198,164,78,.05);border-color:rgba(198,164,78,.2);}
   .card:active .card-media{transform:scale(.97);}
   .card-media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,0,0,.7) 100%);transition:opacity .3s;}
@@ -191,7 +206,7 @@
   .badge-instock{background:linear-gradient(135deg,rgba(107,203,119,.9),rgba(80,180,100,.9));color:#0A0D09;border-color:rgba(107,203,119,.4);}
   @keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.96);}to{opacity:1;transform:translateY(0) scale(1);}}
   .skeleton-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px;}
-  .skel-card-media{aspect-ratio:3/4;border-radius:var(--border-radius-card);background:linear-gradient(110deg,var(--bg-elev) 25%,var(--bg-elev-2) 50%,var(--bg-elev) 75%);background-size:300% 100%;animation:shimmer 2s ease-in-out infinite;}
+  .skel-card-media{aspect-ratio:1/1;border-radius:var(--border-radius-card);background:linear-gradient(110deg,var(--bg-elev) 25%,var(--bg-elev-2) 50%,var(--bg-elev) 75%);background-size:300% 100%;animation:shimmer 2s ease-in-out infinite;}
   .skel-line{height:10px;border-radius:4px;margin-top:12px;background:linear-gradient(110deg,var(--bg-elev) 25%,var(--bg-elev-2) 50%,var(--bg-elev) 75%);background-size:300% 100%;animation:shimmer 2s ease-in-out infinite;width:70%;}
   .skel-line.short{width:45%;margin-top:7px;}
   @keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-100% 0;}}
@@ -210,7 +225,7 @@
   .sheet-close{float:right;background:var(--bg-elev-2);border:1px solid var(--line);color:var(--muted);font-size:18px;line-height:1;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s var(--ease);position:relative;z-index:2;}
   .sheet-close:active{transform:scale(.85);}
   .sheet-close:hover{color:var(--text);border-color:var(--accent);background:var(--accent-dim);}
-  .pd-gallery{position:relative;aspect-ratio:4/3;border-radius:14px;margin:8px 0 20px;overflow:hidden;background-color:var(--bg-elev-2);border:1px solid var(--line);animation:fadeScaleIn .5s var(--ease) both;touch-action:pan-y;box-shadow:0 8px 30px rgba(0,0,0,.3);}
+  .pd-gallery{position:relative;aspect-ratio:1/1;border-radius:14px;margin:8px 0 20px;overflow:hidden;background-color:var(--bg-elev-2);border:1px solid var(--line);animation:fadeScaleIn .5s var(--ease) both;touch-action:pan-y;box-shadow:0 8px 30px rgba(0,0,0,.3);}
   .pd-gallery-track{display:flex;height:100%;transition:transform .5s var(--ease-sheet);}
   .pd-slide{flex:0 0 100%;height:100%;background-size:cover;background-position:center;}
   .pd-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(8,10,7,.6);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);color:#fff;font-family:var(--font-body);display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;cursor:pointer;transition:all .2s var(--ease);opacity:.9;}
@@ -399,7 +414,7 @@
       </svg>
       <div class="brand-text">
         <div class="logo">AngelBags</div>
-        <div class="logo-sub">Leather &amp; Handbags</div>
+        <div class="logo-sub">Bags &amp; Shoes</div>
       </div>
     </div>
     <div class="header-actions">
@@ -432,6 +447,14 @@
         <button class="sort-opt" data-sort="price_asc"><span>Сначала дешевле</span><span class="chk">✓</span></button>
         <button class="sort-opt" data-sort="price_desc"><span>Сначала дороже</span><span class="chk">✓</span></button>
       </div>
+    </div>
+    <div class="color-wrap" id="colorWrap" style="display:none;">
+      <button class="color-btn" id="colorBtn" aria-label="Фильтр по цвету">
+        <span class="color-btn-ring" id="colorBtnIcon">
+          <span style="background:#c6a44e;"></span><span style="background:#8a8a8a;"></span><span style="background:#5a3a2a;"></span><span style="background:#1c1e18;"></span>
+        </span>
+      </button>
+      <div class="color-menu" id="colorMenu"></div>
     </div>
   </div>
   <div class="brands-row" id="brandsRow"></div>
@@ -564,6 +587,9 @@
     <div class="label" style="margin-top:15px;">Телефон</div>
     <input type="tel" id="coPhone" class="text-input" placeholder="+7 900 000-00-00">
 
+    <div class="label" style="margin-top:15px;">Адрес доставки</div>
+    <input type="text" id="coAddress" class="text-input" placeholder="Город, улица, дом, квартира">
+
     <div class="label" style="margin-top:15px;">Комментарий к заказу</div>
     <textarea id="coComment" class="text-input" placeholder="Пожелания по доставке, удобное время и т.п. (необязательно)"></textarea>
 
@@ -649,6 +675,7 @@ let appliedPromo = null; // { code, type, value }
 let promoFormOpen = false;
 let activeCategory = 'Все';
 let activeBrand = 'Все';
+let activeColor = 'Все';
 let currentProduct = null;
 let sortMode = 'default';
 
@@ -737,7 +764,7 @@ function showToast(text, type){
 
 function renderTicker(){
   const t = document.getElementById('ticker');
-  const msg = 'ANGELBAGS · LUXURY LEATHER GOODS · НОВАЯ КОЛЛЕКЦИЯ · ';
+  const msg = 'ПРИМЕРКА / ВОЗВРАТ И ОБМЕН / БЕЗ ПРЕДОПЛАТЫ · ';
   t.innerHTML = `<span>${msg.repeat(4)}</span><span>${msg.repeat(4)}</span>`;
 }
 
@@ -751,8 +778,10 @@ function renderFilters(){
       if (btn.dataset.cat === activeCategory) return;
       activeCategory = btn.dataset.cat;
       activeBrand = 'Все';
+      activeColor = 'Все';
       renderFilters();
       renderBrandFilters();
+      renderColorFilters();
       renderGrid();
       if (tg) tg.HapticFeedback?.impactOccurred('light');
     };
@@ -777,12 +806,60 @@ function renderBrandFilters(){
     btn.onclick = () => {
       if (btn.dataset.brand === activeBrand) return;
       activeBrand = btn.dataset.brand;
+      activeColor = 'Все';
       renderBrandFilters();
+      renderColorFilters();
       renderGrid();
       if (tg) tg.HapticFeedback?.impactOccurred('light');
     };
   });
 }
+
+const colorWrapEl = document.getElementById('colorWrap');
+const colorBtnEl = document.getElementById('colorBtn');
+const colorMenuEl = document.getElementById('colorMenu');
+function renderColorFilters(){
+  let scoped = activeCategory==='Все' ? PRODUCTS : PRODUCTS.filter(p=>p.category===activeCategory);
+  if (activeBrand !== 'Все') scoped = scoped.filter(p=>(p.brand||'').trim()===activeBrand);
+  const colorMap = new Map();
+  scoped.forEach(p=>{
+    const name = (p.color||'').trim();
+    if (name && !colorMap.has(name)) colorMap.set(name, p.color_hex || '#8a8a8a');
+  });
+  if (colorMap.size < 2){
+    colorWrapEl.style.display = 'none';
+    colorMenuEl.classList.remove('open');
+    return;
+  }
+  colorWrapEl.style.display = '';
+  const entries = [...colorMap.entries()].sort((a,b)=>a[0].localeCompare(b[0],'ru'));
+  const allOptHTML = `<button class="color-opt ${activeColor==='Все'?'active':''}" data-color="Все"><span class="dot" style="background:conic-gradient(#c6a44e,#5a3a2a,#1c1e18,#8a8a8a);"></span><span>Все цвета</span></button>`;
+  colorMenuEl.innerHTML = allOptHTML + entries.map(([name, hex]) =>
+    `<button class="color-opt ${name===activeColor?'active':''}" data-color="${name}"><span class="dot" style="background:${hex};"></span><span>${name}</span></button>`
+  ).join('');
+  colorBtnEl.classList.toggle('active', activeColor!=='Все');
+  const activeHex = activeColor!=='Все' ? colorMap.get(activeColor) : null;
+  colorBtnEl.innerHTML = activeHex
+    ? `<span class="color-btn-dot" style="background:${activeHex};"></span>`
+    : `<span class="color-btn-ring" id="colorBtnIcon"><span style="background:#c6a44e;"></span><span style="background:#8a8a8a;"></span><span style="background:#5a3a2a;"></span><span style="background:#1c1e18;"></span></span>`;
+  colorMenuEl.querySelectorAll('.color-opt').forEach(btn=>{
+    btn.onclick = () => {
+      if (btn.dataset.color === activeColor) { colorMenuEl.classList.remove('open'); return; }
+      activeColor = btn.dataset.color;
+      renderColorFilters();
+      renderGrid();
+      colorMenuEl.classList.remove('open');
+      if (tg) tg.HapticFeedback?.impactOccurred('light');
+    };
+  });
+}
+colorBtnEl.onclick = (e) => {
+  e.stopPropagation();
+  colorMenuEl.classList.toggle('open');
+};
+document.addEventListener('click', (e) => {
+  if (!colorMenuEl.contains(e.target) && e.target!==colorBtnEl && !colorBtnEl.contains(e.target)) colorMenuEl.classList.remove('open');
+});
 
 const emptyStateHTML = `
   <div class="empty-state">
@@ -810,7 +887,7 @@ function cardHTML(p, i){
           <button class="card-arrow card-arrow-r" data-id="${p.id}" data-dir="1" aria-label="Следующее фото">›</button>
           <div class="card-dots">${imgs.map((_,di)=>`<div class="card-dot ${di===0?'active':''}"></div>`).join('')}</div>
         ` : ''}
-        <div class="card-label">${p.brand ? `${p.brand} · ${p.category}` : p.category}</div>
+        <div class="card-label">${p.color ? `<span class="card-color-dot" style="background:${p.color_hex||'#8a8a8a'};"></span>` : ''}${p.brand ? `${p.brand} · ${p.category}` : p.category}</div>
       </div>
       <div class="card-name">${p.name}</div>
       <div class="card-price">${priceHTML(p)}</div>
@@ -881,6 +958,7 @@ const scrollSentinel = document.getElementById('scrollSentinel');
 function computeFilteredList(){
   let list = activeCategory==='Все' ? PRODUCTS : PRODUCTS.filter(p=>p.category===activeCategory);
   if (activeBrand !== 'Все') list = list.filter(p=>(p.brand||'').trim()===activeBrand);
+  if (activeColor !== 'Все') list = list.filter(p=>(p.color||'').trim()===activeColor);
   return applySort(list);
 }
 
@@ -1038,7 +1116,7 @@ function openProduct(id){
   currentProduct = PRODUCTS.find(p=>p.id===id);
   const p = currentProduct;
   renderGallery(p);
-  document.getElementById('pdCat').textContent = p.brand ? `${p.brand} · ${p.category}` : p.category;
+  document.getElementById('pdCat').innerHTML = (p.color ? `<span class="pd-color-dot" style="background:${p.color_hex||'#8a8a8a'};"></span>` : '') + (p.brand ? `${p.brand} · ${p.category}` : p.category);
   const pdBadge = document.getElementById('pdBadge');
   if (p.badge && BADGE_LABELS[p.badge]){
     pdBadge.textContent = BADGE_LABELS[p.badge];
@@ -1510,17 +1588,20 @@ document.getElementById('checkoutBtn').onclick = () => {
 async function submitOrder(){
   const nameEl = document.getElementById('coName');
   const phoneEl = document.getElementById('coPhone');
+  const addressEl = document.getElementById('coAddress');
   const name = nameEl.value.trim();
   const phone = phoneEl.value.trim();
+  const address = addressEl.value.trim();
   const comment = document.getElementById('coComment').value.trim();
   const errEl = document.getElementById('coError');
   errEl.textContent = '';
-  nameEl.classList.remove('err'); phoneEl.classList.remove('err');
+  nameEl.classList.remove('err'); phoneEl.classList.remove('err'); addressEl.classList.remove('err');
 
-  if (!name || !phone){
-    errEl.textContent = 'Укажите имя и телефон';
+  if (!name || !phone || !address){
+    errEl.textContent = 'Укажите имя, телефон и адрес доставки';
     if (!name) nameEl.classList.add('err');
     if (!phone) phoneEl.classList.add('err');
+    if (!address) addressEl.classList.add('err');
     if (tg) tg.HapticFeedback?.notificationOccurred('error');
     return;
   }
@@ -1537,7 +1618,7 @@ async function submitOrder(){
   const subtotal = cartSubtotal();
   const discount = appliedPromo ? computePromoDiscount(appliedPromo, subtotal) : 0;
   const payload = {
-    name, phone, comment,
+    name, phone, address, comment,
     items: cart.map(i => ({ id: i.id, name: i.name, size: i.size, qty: i.qty, price: i.price })),
     total: subtotal - discount,
     promo_code: appliedPromo ? appliedPromo.code : undefined,
@@ -1561,6 +1642,7 @@ async function submitOrder(){
     updateBadge();
     document.getElementById('coName').value = '';
     document.getElementById('coPhone').value = '';
+    document.getElementById('coAddress').value = '';
     document.getElementById('coComment').value = '';
     openSheet('successSheet');
     showToast('Заказ отправлен на обработку', 'success');
@@ -1628,6 +1710,7 @@ fetch('products.json').then(r=>r.json()).then(data=>{
   renderTicker();
   renderFilters();
   renderBrandFilters();
+  renderColorFilters();
   renderGrid();
   skeletonGrid.style.display = 'none';
   grid.style.display = 'grid';

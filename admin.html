@@ -90,6 +90,10 @@
     padding:12px 14px;font-family:var(--font-body);font-size:16px;border-radius:8px;outline:none;
     transition:all .2s var(--ease);
   }
+  input[type=color]{
+    width:100%;height:46px;background:var(--bg);border:1.5px solid var(--line);border-radius:8px;
+    cursor:pointer;padding:4px;transition:all .2s var(--ease);
+  }
   input:focus, textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim);}
   textarea{resize:vertical;min-height:80px;line-height:1.6;}
   input::placeholder, textarea::placeholder{color:var(--muted-dim);opacity:1;}
@@ -445,6 +449,18 @@
       </div>
     </div>
 
+    <div class="row">
+      <div>
+        <label>Цвет</label>
+        <input type="text" id="fColor" placeholder="Чёрный" list="colorOptions">
+        <datalist id="colorOptions"></datalist>
+      </div>
+      <div style="flex:0 0 74px;">
+        <label>Оттенок</label>
+        <input type="color" id="fColorHex" value="#8a8a8a">
+      </div>
+    </div>
+
     <label>Цена, ₽</label>
     <input type="number" id="fPrice" placeholder="6990">
 
@@ -672,12 +688,13 @@ function renderList(){
     const cover = (p.images && p.images.length) ? p.images[0] : p.image;
     const photoCount = (p.images && p.images.length) ? p.images.length : (p.image ? 1 : 0);
     const badgeTag = p.badge && BADGE_LABELS[p.badge] ? ` · <span style="color:var(--accent);">${BADGE_LABELS[p.badge]}</span>` : '';
+    const colorTag = p.color ? ` · <span style="display:inline-flex;align-items:center;gap:5px;"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${p.color_hex||'#8a8a8a'};border:1px solid rgba(255,255,255,.25);"></span>${p.color}</span>` : '';
     return `
     <div class="card">
       <div class="thumb" style="${cover ? `background-image:url('${cover}')` : `background:${SWATCHES[p.swatch % SWATCHES.length]}`}"></div>
       <div class="card-body">
         <div class="card-title">${p.name || '(без названия)'}</div>
-        <div class="card-sub">${p.brand ? `<span style="color:var(--accent);">${p.brand}</span> · ` : ''}${p.category || '—'} · ${priceLineHTML(p)}${badgeTag}</div>
+        <div class="card-sub">${p.brand ? `<span style="color:var(--accent);">${p.brand}</span> · ` : ''}${p.category || '—'} · ${priceLineHTML(p)}${badgeTag}${colorTag}</div>
         <div class="card-sub">Размеры: ${(p.sizes||[]).join(', ')}</div>
         <div class="card-sub">${photoCount ? `Фото: ${photoCount}` : 'Без фото'}</div>
         <div class="card-actions">
@@ -744,6 +761,7 @@ function renderOrders(){
       <div class="order-contact">
         👤 ${o.name}<br>
         📞 <a href="tel:${o.phone}">${o.phone}</a>${o.customer_username ? ` · <a href="https://t.me/${o.customer_username}" target="_blank" rel="noopener">@${o.customer_username}</a>` : ''}
+        ${o.address ? `<br>📍 ${o.address}` : ''}
       </div>
       ${o.comment ? `<div class="order-comment">«${o.comment}»</div>` : ''}
       <div class="order-actions">
@@ -1063,6 +1081,8 @@ function openModal(id){
   document.getElementById('fName').value = p?.name || '';
   document.getElementById('fCategory').value = p?.category || '';
   document.getElementById('fBrand').value = p?.brand || '';
+  document.getElementById('fColor').value = p?.color || '';
+  document.getElementById('fColorHex').value = p?.color_hex || '#8a8a8a';
   document.getElementById('fPrice').value = p?.price || '';
   document.getElementById('fOldPrice').value = p?.old_price || '';
   document.getElementById('fSizes').value = (p?.sizes||[]).join(', ');
@@ -1078,6 +1098,8 @@ function openModal(id){
   document.getElementById('categoryOptions').innerHTML = cats.map(c=>`<option value="${c}">`).join('');
   const brands = [...new Set(products.map(x=>x.brand).filter(Boolean))];
   document.getElementById('brandOptions').innerHTML = brands.map(b=>`<option value="${b}">`).join('');
+  const colors = [...new Set(products.map(x=>x.color).filter(Boolean))];
+  document.getElementById('colorOptions').innerHTML = colors.map(c=>`<option value="${c}">`).join('');
 
   document.getElementById('overlay').classList.add('open');
 }
@@ -1155,6 +1177,8 @@ document.getElementById('saveBtn').onclick = async () => {
   const name = document.getElementById('fName').value.trim();
   const category = document.getElementById('fCategory').value.trim();
   const brand = document.getElementById('fBrand').value.trim();
+  const color = document.getElementById('fColor').value.trim();
+  const colorHex = document.getElementById('fColorHex').value || '#8a8a8a';
   const price = document.getElementById('fPrice').value;
   const oldPrice = document.getElementById('fOldPrice').value;
   const sizes = document.getElementById('fSizes').value;
@@ -1166,7 +1190,7 @@ document.getElementById('saveBtn').onclick = async () => {
     return;
   }
 
-  const payload = { name, category, brand, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages };
+  const payload = { name, category, brand, color, color_hex: colorHex, price, old_price: oldPrice, badge: selectedBadge, sizes, desc, swatch: selectedSwatch, images: uploadedImages };
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   try {

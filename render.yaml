@@ -18,6 +18,8 @@ services:
         sync: false
       - key: IMGBB_API_KEY
         sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.7
     # Товары/заказы/вопросы/промокоды хранятся в Postgres (DATABASE_URL), а
     # фото товаров — на бесплатном фотохостинге ImgBB (IMGBB_API_KEY).
     # Локальный диск контейнера ни для чего из этого не используется, так что

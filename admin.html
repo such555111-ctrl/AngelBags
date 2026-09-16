@@ -721,7 +721,8 @@ function renderList(){
     list.innerHTML = '<div class="empty">Пока нет ни одного товара — нажмите «+», чтобы добавить.</div>';
     return;
   }
-  list.innerHTML = products.map(p => {
+  const sortedProducts = products.slice().sort((a,b)=>b.id-a.id); // новые товары — сверху
+  list.innerHTML = sortedProducts.map(p => {
     const cover = (p.images && p.images.length) ? p.images[0] : p.image;
     const photoCount = (p.images && p.images.length) ? p.images.length : (p.image ? 1 : 0);
     const badgeTag = p.badge && BADGE_LABELS[p.badge] ? ` · <span style="color:var(--accent);">${BADGE_LABELS[p.badge]}</span>` : '';

@@ -941,6 +941,7 @@ function applySort(list){
   const sorted = list.slice();
   if (sortMode==='price_asc') sorted.sort((a,b)=>priceRange(a).min-priceRange(b).min);
   else if (sortMode==='price_desc') sorted.sort((a,b)=>priceRange(b).min-priceRange(a).min);
+  else sorted.sort((a,b)=>b.id-a.id); // по умолчанию — сначала новые товары
   return sorted;
 }
 

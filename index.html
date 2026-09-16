@@ -275,6 +275,7 @@
   .size-btn{min-width:48px;padding:10px 14px;border:1.5px solid var(--line);background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:13px;border-radius:6px;cursor:pointer;transition:all .2s var(--ease);font-weight:500;}
   .size-btn:active{transform:scale(.9);}
   .size-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);box-shadow:0 0 15px rgba(198,164,78,.1);}
+  .size-btn-price{display:block;font-size:10px;margin-top:3px;opacity:.7;font-weight:400;}
   .size-btn:hover:not(.active){border-color:var(--muted-dim);}
   .btn-primary{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent-soft));color:#0A0D09;border:none;padding:16px;font-family:var(--font-heading);font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;border-radius:var(--border-radius-btn);cursor:pointer;position:relative;overflow:hidden;transition:all .25s var(--ease);box-shadow:0 8px 25px rgba(198,164,78,.25);}
   .btn-primary::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,transparent,rgba(255,255,255,.2),transparent);transform:translateX(-100%);transition:transform .5s;}
@@ -662,9 +663,24 @@ const SWATCHES = [
 ];
 const fmt = n => n.toLocaleString('ru-RU') + ' ₽';
 const BADGE_LABELS = { hit:'Хит', trend:'В тренде', sale:'Скидка', instock:'В наличии' };
-const priceHTML = p => (p.old_price && p.old_price > p.price)
-  ? `<span class="price-old">${fmt(p.old_price)}</span><span class="price-new">${fmt(p.price)}</span>`
-  : fmt(p.price);
+// Эффективная цена конкретного размера: своя цена, если задана в админке,
+// иначе базовая цена товара.
+const sizePrice = (p, sizeObj) => (sizeObj && sizeObj.price != null) ? sizeObj.price : p.price;
+
+// Диапазон цен по всем размерам товара — нужен, чтобы на карточке в
+// каталоге показать "от X ₽", если у размеров разные цены.
+const priceRange = p => {
+  const prices = (p.sizes && p.sizes.length) ? p.sizes.map(s => sizePrice(p, s)) : [p.price];
+  return { min: Math.min(...prices), max: Math.max(...prices) };
+};
+
+const priceHTML = p => {
+  const { min, max } = priceRange(p);
+  if (min !== max) return `от ${fmt(min)}`;
+  return (p.old_price && p.old_price > p.price)
+    ? `<span class="price-old">${fmt(p.old_price)}</span><span class="price-new">${fmt(p.price)}</span>`
+    : fmt(p.price);
+};
 const firstImage = p => (p.images && p.images.length) ? p.images[0] : (p.image || null);
 const slideBg = (url, p) => url ? `background-image:url('${url}');background-size:cover;background-position:center;` : `background:${SWATCHES[p.swatch % SWATCHES.length]};`;
 const media = p => slideBg(firstImage(p), p);
@@ -923,8 +939,8 @@ function attachCardHandlers(container){
 
 function applySort(list){
   const sorted = list.slice();
-  if (sortMode==='price_asc') sorted.sort((a,b)=>a.price-b.price);
-  else if (sortMode==='price_desc') sorted.sort((a,b)=>b.price-a.price);
+  if (sortMode==='price_asc') sorted.sort((a,b)=>priceRange(a).min-priceRange(b).min);
+  else if (sortMode==='price_desc') sorted.sort((a,b)=>priceRange(b).min-priceRange(a).min);
   return sorted;
 }
 
@@ -1125,12 +1141,24 @@ function openProduct(id){
     pdBadge.style.display = 'none';
   }
   document.getElementById('pdName').textContent = p.name;
-  document.getElementById('pdPrice').innerHTML = priceHTML(p);
   document.getElementById('pdDesc').textContent = p.desc;
   const sizesEl = document.getElementById('pdSizes');
-  sizesEl.innerHTML = p.sizes.map((s,i)=>`<button class="size-btn ${i===0?'active':''}" data-size="${s}">${s}</button>`).join('');
-  sizesEl.querySelectorAll('.size-btn').forEach(b=>{
-    b.onclick = ()=>{ sizesEl.querySelectorAll('.size-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
+  const sizePrices = p.sizes.map(s => sizePrice(p, s));
+  const pricesDiffer = new Set(sizePrices).size > 1;
+  sizesEl.innerHTML = p.sizes.map((s,i)=>`
+    <button class="size-btn ${i===0?'active':''}" data-size="${s.size}">${s.size}${pricesDiffer?`<span class="size-btn-price">${fmt(sizePrices[i])}</span>`:''}</button>
+  `).join('');
+  const updatePdPrice = (sizeObj) => {
+    const price = sizePrice(p, sizeObj);
+    const priceEl = document.getElementById('pdPrice');
+    const usesBasePrice = !sizeObj || sizeObj.price == null;
+    priceEl.innerHTML = (usesBasePrice && p.old_price && p.old_price > price)
+      ? `<span class="price-old">${fmt(p.old_price)}</span><span class="price-new">${fmt(price)}</span>`
+      : fmt(price);
+  };
+  updatePdPrice(p.sizes[0]);
+  sizesEl.querySelectorAll('.size-btn').forEach((b,i)=>{
+    b.onclick = ()=>{ sizesEl.querySelectorAll('.size-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); updatePdPrice(p.sizes[i]); };
   });
   const addBtn = document.getElementById('pdAdd');
   addBtn.disabled = false;
@@ -1235,10 +1263,12 @@ document.getElementById('pdGallery').addEventListener('click', (e) => {
 });
 
 document.getElementById('pdAdd').onclick = (e) => {
-  const size = document.querySelector('#pdSizes .size-btn.active')?.dataset.size || currentProduct.sizes[0];
+  const size = document.querySelector('#pdSizes .size-btn.active')?.dataset.size || currentProduct.sizes[0].size;
+  const sizeObj = currentProduct.sizes.find(s=>s.size===size) || currentProduct.sizes[0];
+  const price = sizePrice(currentProduct, sizeObj);
   const existing = cart.find(i=>i.id===currentProduct.id && i.size===size);
   if (existing) existing.qty += 1;
-  else cart.push({ id: currentProduct.id, name: currentProduct.name, price: currentProduct.price, size, swatch: currentProduct.swatch, images: currentProduct.images, image: currentProduct.image, qty: 1 });
+  else cart.push({ id: currentProduct.id, name: currentProduct.name, price, size, swatch: currentProduct.swatch, images: currentProduct.images, image: currentProduct.image, qty: 1 });
   updateBadge();
   const btn = e.currentTarget;
   btn.textContent = 'Добавлено ✓';

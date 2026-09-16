@@ -97,6 +97,17 @@
   input:focus, textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-dim);}
   textarea{resize:vertical;min-height:80px;line-height:1.6;}
   input::placeholder, textarea::placeholder{color:var(--muted-dim);opacity:1;}
+  /* Собственная стрелочка для полей со списком подсказок (datalist) —
+     нативная стрелка браузера показывается не везде (например, в Safari
+     на iPhone/iPad её нет вообще), поэтому рисуем свою, одинаковую
+     на любом устройстве. Сама подсказка при этом остаётся нативной. */
+  .select-field{position:relative;}
+  .select-field input{padding-right:34px;}
+  .select-field::after{
+    content:"";position:absolute;right:15px;top:50%;width:8px;height:8px;margin-top:-6px;
+    border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);
+    transform:rotate(45deg);pointer-events:none;
+  }
   .swatches{display:flex;gap:10px;margin-top:6px;}
   .swatch-opt{
     width:34px;height:34px;border-radius:50%;border:2.5px solid transparent;cursor:pointer;
@@ -133,6 +144,11 @@
   .btn-danger:hover{background:rgba(255,107,107,.1);}
   .btn-icon-label{display:inline-flex;align-items:center;gap:6px;}
   .row{display:flex;gap:10px;}
+  .size-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .size-row input[type=text]{flex:1;min-width:0;}
+  .size-row input[type=number]{flex:1;min-width:0;}
+  .size-row-remove{flex:0 0 auto;width:40px;height:40px;border-radius:8px;background:transparent;border:1.5px solid var(--line);color:var(--muted);font-size:16px;cursor:pointer;transition:all .2s var(--ease);}
+  .size-row-remove:hover{border-color:var(--danger);color:var(--danger);}
   .row > *{flex:1;}
   .badge-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;}
   .badge-opt{
@@ -447,21 +463,27 @@
     <div class="row">
       <div>
         <label>Категория</label>
-        <input type="text" id="fCategory" placeholder="Кроссбоди" list="categoryOptions">
-        <datalist id="categoryOptions"></datalist>
+        <div class="select-field">
+          <input type="text" id="fCategory" placeholder="Кроссбоди" list="categoryOptions">
+          <datalist id="categoryOptions"></datalist>
+        </div>
       </div>
       <div>
         <label>Бренд</label>
-        <input type="text" id="fBrand" placeholder="AngelBags" list="brandOptions">
-        <datalist id="brandOptions"></datalist>
+        <div class="select-field">
+          <input type="text" id="fBrand" placeholder="AngelBags" list="brandOptions">
+          <datalist id="brandOptions"></datalist>
+        </div>
       </div>
     </div>
 
     <div class="row">
       <div>
         <label>Цвет</label>
-        <input type="text" id="fColor" placeholder="Чёрный" list="colorOptions">
-        <datalist id="colorOptions"></datalist>
+        <div class="select-field">
+          <input type="text" id="fColor" placeholder="Чёрный" list="colorOptions">
+          <datalist id="colorOptions"></datalist>
+        </div>
       </div>
       <div style="flex:0 0 74px;">
         <label>Оттенок</label>
@@ -484,8 +506,10 @@
       <button type="button" class="badge-opt" data-badge="instock">В наличии</button>
     </div>
 
-    <label>Размеры (через запятую)</label>
-    <input type="text" id="fSizes" placeholder="S, M, L, XL">
+    <label>Размеры и цены</label>
+    <div class="muted" style="margin-top:-4px;margin-bottom:8px;">Если цена для размера не указана — используется базовая цена товара выше</div>
+    <div id="sizesEditor"></div>
+    <button type="button" class="btn-outline" id="addSizeBtn" style="margin-top:2px;width:100%;">+ Добавить размер</button>
 
     <label>Описание</label>
     <textarea id="fDesc" placeholder="Короткое описание товара"></textarea>
@@ -561,6 +585,10 @@ function priceLineHTML(p){
   }
   return fmt(p.price);
 }
+function sizesLineHTML(p){
+  const sizes = p.sizes || [];
+  return sizes.map(s => s.price != null ? `${s.size} (${fmt(s.price)})` : s.size).join(', ');
+}
 
 let pwd = localStorage.getItem('angelbags_admin_pwd') || '';
 let products = [];
@@ -572,6 +600,7 @@ let editingId = null;
 let selectedSwatch = 0;
 let selectedBadge = '';
 let uploadedImages = [];
+let sizesState = [];
 let editingPromoId = null;
 let selectedPromoType = 'percent';
 let selectedPromoActive = true;
@@ -703,7 +732,7 @@ function renderList(){
       <div class="card-body">
         <div class="card-title">${p.name || '(без названия)'}</div>
         <div class="card-sub">${p.brand ? `<span style="color:var(--accent);">${p.brand}</span> · ` : ''}${p.category || '—'} · ${priceLineHTML(p)}${badgeTag}${colorTag}</div>
-        <div class="card-sub">Размеры: ${(p.sizes||[]).join(', ')}</div>
+        <div class="card-sub">Размеры: ${sizesLineHTML(p)}</div>
         <div class="card-sub">${photoCount ? `Фото: ${photoCount}` : 'Без фото'}</div>
         <div class="card-actions">
           <button class="btn-icon-only" data-del="${p.id}" title="Удалить" aria-label="Удалить"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></button>
@@ -1080,6 +1109,34 @@ document.querySelectorAll('#badgePicker .badge-opt').forEach(btn=>{
   btn.onclick = () => { selectedBadge = btn.dataset.badge; renderBadgePicker(); };
 });
 
+function renderSizesEditor(){
+  const el = document.getElementById('sizesEditor');
+  if (!sizesState.length){
+    el.innerHTML = '<div class="muted" style="margin:0 0 8px;">Размеров пока нет — добавьте хотя бы один</div>';
+    return;
+  }
+  el.innerHTML = sizesState.map((s,i)=>`
+    <div class="size-row" data-i="${i}">
+      <input type="text" class="size-name-input" data-i="${i}" placeholder="S" value="${s.size||''}">
+      <input type="number" class="size-price-input" data-i="${i}" placeholder="цена (необязательно)" value="${s.price==null?'':s.price}">
+      <button type="button" class="size-row-remove" data-remove="${i}" title="Удалить размер">×</button>
+    </div>
+  `).join('');
+  el.querySelectorAll('.size-name-input').forEach(inp=>{
+    inp.oninput = () => { sizesState[Number(inp.dataset.i)].size = inp.value; };
+  });
+  el.querySelectorAll('.size-price-input').forEach(inp=>{
+    inp.oninput = () => { sizesState[Number(inp.dataset.i)].price = inp.value; };
+  });
+  el.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.onclick = () => { sizesState.splice(Number(btn.dataset.remove), 1); renderSizesEditor(); };
+  });
+}
+document.getElementById('addSizeBtn').onclick = () => {
+  sizesState.push({ size: '', price: '' });
+  renderSizesEditor();
+};
+
 function openModal(id, duplicateSource){
   // duplicateSource — если задан, модалка заполняется данными этого товара,
   // но editingId остаётся пустым, так что при сохранении создастся НОВЫЙ
@@ -1100,14 +1157,17 @@ function openModal(id, duplicateSource){
   document.getElementById('fColorHex').value = p?.color_hex || '#8a8a8a';
   document.getElementById('fPrice').value = p?.price || '';
   document.getElementById('fOldPrice').value = p?.old_price || '';
-  document.getElementById('fSizes').value = (p?.sizes||[]).join(', ');
   document.getElementById('fDesc').value = p?.desc || '';
   selectedSwatch = p?.swatch || 0;
   selectedBadge = p?.badge || '';
   uploadedImages = (p?.images && p.images.length) ? [...p.images] : (p?.image ? [p.image] : []);
+  sizesState = (p?.sizes && p.sizes.length)
+    ? p.sizes.map(s => typeof s === 'string' ? { size: s, price: '' } : { size: s.size || '', price: s.price == null ? '' : s.price })
+    : [{ size: '', price: '' }];
   renderSwatchPicker();
   renderBadgePicker();
   renderPhotoGrid();
+  renderSizesEditor();
 
   const cats = [...new Set(products.map(x=>x.category).filter(Boolean))];
   document.getElementById('categoryOptions').innerHTML = cats.map(c=>`<option value="${c}">`).join('');
@@ -1242,7 +1302,9 @@ document.getElementById('saveBtn').onclick = async () => {
   const colorHex = document.getElementById('fColorHex').value || '#8a8a8a';
   const price = document.getElementById('fPrice').value;
   const oldPrice = document.getElementById('fOldPrice').value;
-  const sizes = document.getElementById('fSizes').value;
+  const sizes = sizesState
+    .map(s => ({ size: (s.size||'').trim(), price: (s.price===''||s.price==null) ? null : Number(s.price) }))
+    .filter(s => s.size);
   const desc = document.getElementById('fDesc').value.trim();
 
 

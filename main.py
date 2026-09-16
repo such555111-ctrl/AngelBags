@@ -188,11 +188,13 @@ def _db_save(key, items):
 
 def load_products():
     if DATABASE_URL:
-        return _db_load("products")
-    if not os.path.exists(PRODUCTS_FILE):
-        return []
-    with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        items = _db_load("products")
+    elif not os.path.exists(PRODUCTS_FILE):
+        items = []
+    else:
+        with open(PRODUCTS_FILE, "r", encoding="utf-8") as f:
+            items = json.load(f)
+    return [normalize_product(p) for p in items]
 
 
 def save_products(items):
@@ -335,6 +337,52 @@ def sanitize_old_price(raw):
     except (TypeError, ValueError):
         return None
     return v if v > 0 else None
+
+
+def sanitize_sizes(raw):
+    """Приводит размеры товара к единому формату — списку объектов
+    {"size": "S", "price": 6990 или None}.
+
+    Понимает как новый формат (список объектов с ценой на каждый размер),
+    так и старый (список строк или строка через запятую "S, M, L") — это
+    нужно, чтобы товары, сохранённые до появления цен по размерам,
+    продолжали корректно отображаться."""
+    def _price(v):
+        if v in (None, ""):
+            return None
+        try:
+            n = int(float(v))
+        except (TypeError, ValueError):
+            return None
+        return n if n > 0 else None
+
+    result = []
+    if isinstance(raw, str):
+        for name in raw.split(","):
+            name = name.strip()
+            if name:
+                result.append({"size": name, "price": None})
+    elif isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                name = str(item.get("size") if item.get("size") is not None else item.get("name") or "").strip()
+                if not name:
+                    continue
+                result.append({"size": name, "price": _price(item.get("price"))})
+            elif isinstance(item, str):
+                name = item.strip()
+                if name:
+                    result.append({"size": name, "price": None})
+    return result
+
+
+def normalize_product(p):
+    """Гарантирует, что у товара, прочитанного из хранилища, поле sizes
+    всегда в новом формате — даже если товар был сохранён старой версией
+    приложения."""
+    sizes = sanitize_sizes(p.get("sizes") or [])
+    p["sizes"] = sizes or [{"size": "One size", "price": None}]
+    return p
 
 
 # --- Промокоды -----------------------------------------------------------
@@ -746,8 +794,7 @@ def admin_create_product():
     data = request.get_json(force=True, silent=True) or {}
     items = load_products()
     new_id = (max([p.get("id", 0) for p in items], default=0) + 1)
-    sizes_raw = data.get("sizes", "")
-    sizes = [s.strip() for s in sizes_raw.split(",") if s.strip()] if isinstance(sizes_raw, str) else (sizes_raw or [])
+    sizes = sanitize_sizes(data.get("sizes", ""))
     try:
         price = int(float(data.get("price") or 0))
     except (TypeError, ValueError):
@@ -763,7 +810,7 @@ def admin_create_product():
         "price": price,
         "old_price": sanitize_old_price(data.get("old_price")),
         "badge": sanitize_badge(data.get("badge")),
-        "sizes": sizes or ["One size"],
+        "sizes": sizes or [{"size": "One size", "price": None}],
         "swatch": int(data.get("swatch") or 0) % 6,
         "desc": (data.get("desc") or "").strip(),
         "images": images,
@@ -801,8 +848,8 @@ def admin_update_product(pid):
             if "badge" in data:
                 p["badge"] = sanitize_badge(data.get("badge"))
             if "sizes" in data:
-                sizes_raw = data.get("sizes", "")
-                p["sizes"] = [s.strip() for s in sizes_raw.split(",") if s.strip()] if isinstance(sizes_raw, str) else (sizes_raw or p["sizes"])
+                sizes = sanitize_sizes(data.get("sizes", ""))
+                p["sizes"] = sizes or [{"size": "One size", "price": None}]
             if "desc" in data:
                 p["desc"] = (data.get("desc") or "").strip()
             if "swatch" in data:
